@@ -1,0 +1,27 @@
+{
+  "m": "94479832867339989606768980440585133738057206168108084113962474304419911769022631643217920499371010440268883085691757814169390325773346393352635062034929032551259971272889979690623208274501860997742289",
+  "d": 3,
+  "n_rows": 768,
+  "columns": [
+    "Pregnancies",
+    "Glucose",
+    "BloodPressure",
+    "SkinThickness",
+    "Insulin",
+    "BMI",
+    "DiabetesPedigreeFunction",
+    "Age",
+    "Outcome"
+  ],
+  "decimal_places": {
+    "Pregnancies": 0,
+    "Glucose": 0,
+    "BloodPressure": 0,
+    "SkinThickness": 0,
+    "Insulin": 0,
+    "BMI": 1,
+    "DiabetesPedigreeFunction": 3,
+    "Age": 0,
+    "Outcome": 0
+  }
+}

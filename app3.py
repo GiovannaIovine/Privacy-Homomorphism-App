@@ -1,70 +1,68 @@
 from flask import Flask, render_template, request
-import uuid
 import os
+from werkzeug.utils import secure_filename
+import pandas as pd
+from step2_server_sum import *
 
 app = Flask(__name__)
 
+UPLOAD_FOLDER = "uploads"
 OUTPUT_FOLDER = "outputs"
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 @app.route("/")
 def home():
     return render_template("Index2.html")
 
 
-def safe_mean(values):
-    values = [v for v in values if v is not None]
-    return sum(values) / len(values) if len(values) > 0 else 0
-
-
 @app.route("/upload", methods=["POST"])
 def upload():
 
-    file = request.files["file"]
+    csv_file = request.files["file"]
+    json_file = request.files["metadata"]
 
-    lines = file.read().decode("utf-8").strip().split("\n")
+    csv_name = secure_filename(csv_file.filename)
+    json_name = secure_filename(json_file.filename)
 
-    header = lines[0].split(",")
-    data_lines = lines[1:]
+    csv_path = os.path.join(UPLOAD_FOLDER, csv_name)
+    json_path = os.path.join(UPLOAD_FOLDER, json_name)
 
-    columns = [[] for _ in header]
-    print("HEADER:", len(header))
+    csv_file.save(csv_path)
+    json_file.save(json_path)
+    # output file generato dalla tua funzione
+    output_file = os.path.join(OUTPUT_FOLDER, "encrypted_sums.csv")
+
+    # 1. chiami la tua funzione
+    server_sum(csv_path, json_path, output_file)
     
-    for line in data_lines:
+    # 2. leggi CSV output
+    df = pd.read_csv(output_file)
 
-        parts = line.split(",")
-        print("PARTS:", len(parts))
-
-        for i, value in enumerate(parts):
-
-            try:
-                if value != "":
-                    columns[i].append(int(value))
-                else:
-                    columns[i].append(None)
-            except:
-                columns[i].append(None)
-
-    means = [safe_mean(col) for col in columns]
-
+    def parse_column(cell):
+        data = json.loads(cell)  # converte stringa -> lista JSON
+        return [float(x[1]) for x in data]  # prende seconda colonna
     
+    columns = df.columns.tolist()
+    parsed = {}
 
-    # output CSV
-    file_id = str(uuid.uuid4())
-    out_file = os.path.join(OUTPUT_FOLDER, f"{file_id}_avg.csv")
+    for col in columns:
+        parsed[col] = parse_column(df[col].iloc[0])
 
-    with open(out_file, "w") as f:
-        f.write(",".join(header) + "\n")
-        f.write(",".join(map(str, means)) + "\n")
+    num_rows = len(parsed[columns[0]])
 
-    # HTML 
+    means = [sum(parsed[col]) / num_rows for col in columns]
+    header = columns
+    
+    # 5. costruzione tabella HTML
     table_html = "<table><tr>"
     table_html += "".join(f"<th>{h}</th>" for h in header)
     table_html += "</tr><tr>"
     table_html += "".join(f"<td>{m}</td>" for m in means)
     table_html += "</tr></table>"
 
+    # 6. pagina HTML finale
     return f"""
     <html>
     <head>
@@ -75,15 +73,9 @@ def upload():
                 background: #f3f4f6;
                 padding: 40px;
             }}
-            .container {{
-                max-width: 800px;
-                margin: auto;
-                background: white;
-                padding: 30px;
-                border-radius: 12px;
-            }}
+
             table {{
-                width: 100%;
+                width: 80%;
                 border-collapse: collapse;
                 margin-top: 20px;
             }}
@@ -115,7 +107,8 @@ def upload():
 
             {table_html}
 
-            <a class="button" href="/download/{file_id}">
+            <br><br>
+            <a class="button" href="/download/output.csv">
                 Download CSV
             </a>
 
@@ -126,16 +119,6 @@ def upload():
     </body>
     </html>
     """
-
-
-@app.route("/download/<file_id>")
-def download(file_id):
-    path = os.path.join(OUTPUT_FOLDER, f"{file_id}_avg.csv")
-    return open(path, "rb").read(), 200, {
-        "Content-Type": "text/csv",
-        "Content-Disposition": "attachment; filename=column_averages.csv"
-    }
-
 
 if __name__ == "__main__":
     app.run(debug=True)
